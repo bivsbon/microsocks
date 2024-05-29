@@ -1,0 +1,6 @@
+{
+    "listenip": "0.0.0.0",
+    "port": "1080",
+    "auth_user": "minh12",
+    "auth_pass": "123456"
+}

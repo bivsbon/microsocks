@@ -35,6 +35,9 @@
 #include <limits.h>
 #include "server.h"
 #include "sblist.h"
+#include "cJSON.h" // Include cJSON library for JSON parsing
+
+#define CONFIG_FILE "microsocks_config.json"
 
 /* timeout in microseconds on resource exhaustion to prevent excessive
    cpu usage. */
@@ -401,7 +404,75 @@ static void zero_arg(char *s) {
 	for(i=0;i<l;i++) s[i] = 0;
 }
 
+typedef struct {
+    const char* listenip;
+    unsigned port;
+    const char* auth_user;
+    const char* auth_pass;
+} Config;
+
+Config read_config() {
+    Config config;
+
+    // Initialize default values
+    config.listenip = "0.0.0.0";
+    config.port = 1080;
+    config.auth_user = "minh";
+    config.auth_pass = "123";
+
+    // Read and parse JSON config file
+    FILE* file = fopen(CONFIG_FILE, "r");
+    if (file) {
+        fseek(file, 0, SEEK_END);
+        long length = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        char* data = (char*)malloc(length + 1);
+        if (data) {
+            fread(data, 1, length, file);
+            fclose(file);
+            data[length] = '\0';
+
+            cJSON* json = cJSON_Parse(data);
+            if (json) {
+                cJSON* item = cJSON_GetObjectItem(json, "listenip");
+                if (item && cJSON_IsString(item)) {
+                    config.listenip = strdup(item->valuestring);
+                }
+
+                item = cJSON_GetObjectItem(json, "port");
+                if (item && cJSON_IsNumber(item)) {
+                    config.port = item->valueint;
+                }
+
+                item = cJSON_GetObjectItem(json, "auth_user");
+                if (item && cJSON_IsString(item)) {
+                    config.auth_user = strdup(item->valuestring);
+                }
+
+                item = cJSON_GetObjectItem(json, "auth_pass");
+                if (item && cJSON_IsString(item)) {
+                    config.auth_pass = strdup(item->valuestring);
+                }
+
+                cJSON_Delete(json);
+            }
+            free(data);
+        }
+    }
+
+    return config;
+}
+
 int main(int argc, char** argv) {
+    // Read config file
+    Config config = read_config();
+
+    // Use config parameters to initialize the server
+    printf("Config: listenip=%s, port=%u, auth_user=%s, auth_pass=%s\n",
+           config.listenip, config.port, config.auth_user ? config.auth_user : "(null)",
+           config.auth_pass ? config.auth_pass : "(null)");
+	auth_user = strdup(config.auth_user);
+	auth_pass = strdup(config.auth_pass);
 	int ch;
 	const char *listenip = "0.0.0.0";
 	unsigned port = 1080;
