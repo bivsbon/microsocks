@@ -70,6 +70,7 @@ static sblist* auth_ips;
 static pthread_rwlock_t auth_ips_lock = PTHREAD_RWLOCK_INITIALIZER;
 static const struct server* server;
 static union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
+static const char* bind_addr_str;
 
 enum socksstate {
 	SS_1_CONNECTED,
@@ -153,18 +154,17 @@ int read_config(const char *filename, const char* listenip, unsigned* port) {
 
             if (strcmp(key, "ip") == 0) {
 				listenip = strdup(value);
-                // strncpy(listenip, value, sizeof(config->server) - 1);
-                // config->server[sizeof(config->server) - 1] = '\0';
             } else if (strcmp(key, "port") == 0) {
 				*port = atoi(value);
             } else if (strcmp(key, "user") == 0) {
 				auth_user = strdup(value);
-                // strncpy(auth_user, value, sizeof(config->username) - 1);
-                // config->username[sizeof(config->username) - 1] = '\0';
             } else if (strcmp(key, "password") == 0) {
 				auth_pass = strdup(value);
-                // strncpy(auth_pass, value, sizeof(config->password) - 1);
-                // config->password[sizeof(config->password) - 1] = '\0';
+            } else if (strcmp(key, "logging") == 0) {
+				if (strcmp(value, "false") == 0) quiet = 1;
+				else quiet = 0;
+            } else if (strcmp(key, "bindaddr") == 0) {
+				bind_addr_str = strdup(value);
             }
         }
     }
@@ -289,6 +289,12 @@ static enum authmethod check_auth_method(unsigned char *buf, size_t n, struct cl
 	if(idx >= n ) return AM_INVALID;
 	int n_methods = buf[idx];
 	idx++;
+	int authed = 0;
+	if(pthread_rwlock_rdlock(&auth_ips_lock) == 0) {
+		authed = is_in_authed_list(&client->addr);
+		pthread_rwlock_unlock(&auth_ips_lock);
+	}
+	if(!authed) return AM_INVALID;
 	while(idx < n && n_methods > 0) {
 		if(buf[idx] == AM_NO_AUTH) {
 			if(!auth_user) return AM_NO_AUTH;
@@ -469,6 +475,7 @@ static void zero_arg(char *s) {
 }
 
 int main(int argc, char** argv) {
+	int bindaddr_resolved = 0;
 	int ch;
 	const char *listenip2 = "0.0.0.0";
 	char *p, *q;
@@ -506,6 +513,7 @@ int main(int argc, char** argv) {
 				break;
 			case 'b':
 				resolve_sa(optarg, 0, &bind_addr);
+				bindaddr_resolved = 1;
 				break;
 			case 'u':
 				auth_user = strdup(optarg);
@@ -527,6 +535,9 @@ int main(int argc, char** argv) {
 			case '?':
 				return usage();
 		}
+	}
+	if(!bindaddr_resolved && strcmp(bind_addr_str, "default") != 0) {
+		resolve_sa(bind_addr_str, 0, &bind_addr);
 	}
 	if((auth_user && !auth_pass) || (!auth_user && auth_pass)) {
 		dprintf(2, "error: user and pass must be used together\n");
