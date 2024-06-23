@@ -26,6 +26,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <signal.h>
@@ -61,6 +62,7 @@
 #define THREAD_STACK_SIZE 32*1024
 #endif
 
+#define MAX_LINE_LENGTH 64
 static int quiet;
 static const char* auth_user;
 static const char* auth_pass;
@@ -149,17 +151,20 @@ int read_config(const char *filename, const char* listenip, unsigned* port) {
             key = trim_whitespace(key);
             value = trim_whitespace(value);
 
-            if (strcmp(key, "server") == 0) {
-                strncpy(config->server, value, sizeof(config->server) - 1);
-                config->server[sizeof(config->server) - 1] = '\0';
+            if (strcmp(key, "ip") == 0) {
+				listenip = strdup(value);
+                // strncpy(listenip, value, sizeof(config->server) - 1);
+                // config->server[sizeof(config->server) - 1] = '\0';
             } else if (strcmp(key, "port") == 0) {
-                config->port = atoi(value);
-            } else if (strcmp(key, "username") == 0) {
-                strncpy(config->username, value, sizeof(config->username) - 1);
-                config->username[sizeof(config->username) - 1] = '\0';
+				*port = atoi(value);
+            } else if (strcmp(key, "users") == 0) {
+				auth_user = strdup(value);
+                // strncpy(auth_user, value, sizeof(config->username) - 1);
+                // config->username[sizeof(config->username) - 1] = '\0';
             } else if (strcmp(key, "password") == 0) {
-                strncpy(config->password, value, sizeof(config->password) - 1);
-                config->password[sizeof(config->password) - 1] = '\0';
+				auth_pass = strdup(value);
+                // strncpy(auth_pass, value, sizeof(config->password) - 1);
+                // config->password[sizeof(config->password) - 1] = '\0';
             }
         }
     }
@@ -465,9 +470,17 @@ static void zero_arg(char *s) {
 
 int main(int argc, char** argv) {
 	int ch;
-	const char *listenip = "0.0.0.0";
+	const char *listenip2 = "0.0.0.0";
 	char *p, *q;
+	unsigned port2 = 1080;
+	read_config("sample.conf", listenip2, &port2);
+	printf("Listen ip is %s", listenip2);
+	printf("port is %d", port2);
+	const char *listenip = "0.0.0.0";
 	unsigned port = 1080;
+	// printf("User is %s", auth_user);
+	// printf("Password is %s", auth_pass);
+
 	while((ch = getopt(argc, argv, ":1qb:i:p:u:P:w:")) != -1) {
 		switch(ch) {
 			case 'w': /* fall-through */
