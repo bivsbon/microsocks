@@ -157,7 +157,7 @@ int read_config(const char *filename, const char* listenip, unsigned* port) {
                 // config->server[sizeof(config->server) - 1] = '\0';
             } else if (strcmp(key, "port") == 0) {
 				*port = atoi(value);
-            } else if (strcmp(key, "users") == 0) {
+            } else if (strcmp(key, "user") == 0) {
 				auth_user = strdup(value);
                 // strncpy(auth_user, value, sizeof(config->username) - 1);
                 // config->username[sizeof(config->username) - 1] = '\0';
