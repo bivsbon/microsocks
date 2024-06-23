@@ -113,6 +113,61 @@ struct thread {
 static void dolog(const char* fmt, ...) { }
 #endif
 
+char *trim_whitespace(char *str) {
+    char *end;
+
+    // Trim leading space
+    while(isspace((unsigned char)*str)) str++;
+
+    if(*str == 0)  // All spaces?
+        return str;
+
+    // Trim trailing space
+    end = str + strlen(str) - 1;
+    while(end > str && isspace((unsigned char)*end)) end--;
+
+    // Write new null terminator character
+    end[1] = '\0';
+
+    return str;
+}
+
+// Function to read configuration file and parse settings
+int read_config(const char *filename, const char* listenip, unsigned* port) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Could not open configuration file");
+        return -1;
+    }
+
+    char line[MAX_LINE_LENGTH];
+    while (fgets(line, sizeof(line), file)) {
+        char *key = strtok(line, "=");
+        char *value = strtok(NULL, "\n");
+
+        if (key && value) {
+            key = trim_whitespace(key);
+            value = trim_whitespace(value);
+
+            if (strcmp(key, "server") == 0) {
+                strncpy(config->server, value, sizeof(config->server) - 1);
+                config->server[sizeof(config->server) - 1] = '\0';
+            } else if (strcmp(key, "port") == 0) {
+                config->port = atoi(value);
+            } else if (strcmp(key, "username") == 0) {
+                strncpy(config->username, value, sizeof(config->username) - 1);
+                config->username[sizeof(config->username) - 1] = '\0';
+            } else if (strcmp(key, "password") == 0) {
+                strncpy(config->password, value, sizeof(config->password) - 1);
+                config->password[sizeof(config->password) - 1] = '\0';
+            }
+        }
+    }
+
+    fclose(file);
+    return 0;
+}
+
 static struct addrinfo* addr_choose(struct addrinfo* list, union sockaddr_union* bindaddr) {
 	int af = SOCKADDR_UNION_AF(bindaddr);
 	if(af == AF_UNSPEC) return list;
