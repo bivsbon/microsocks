@@ -290,12 +290,14 @@ static enum authmethod check_auth_method(unsigned char *buf, size_t n, struct cl
 	if(idx >= n ) return AM_INVALID;
 	int n_methods = buf[idx];
 	idx++;
-	int authed = 0;
-	if(pthread_rwlock_rdlock(&auth_ips_lock) == 0) {
-		authed = is_in_authed_list(&client->addr);
-		pthread_rwlock_unlock(&auth_ips_lock);
+	if (auth_ips) {
+		int authed = 0;
+		if(pthread_rwlock_rdlock(&auth_ips_lock) == 0) {
+			authed = is_in_authed_list(&client->addr);
+			pthread_rwlock_unlock(&auth_ips_lock);
+		}
+		if(!authed) return AM_INVALID;
 	}
-	if(!authed) return AM_INVALID;
 	while(idx < n && n_methods > 0) {
 		if(buf[idx] == AM_NO_AUTH) {
 			if(!auth_user) return AM_NO_AUTH;
