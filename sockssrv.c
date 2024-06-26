@@ -36,6 +36,7 @@
 #include <limits.h>
 #include "server.h"
 #include "sblist.h"
+#include <time.h>
 
 /* timeout in microseconds on resource exhaustion to prevent excessive
    cpu usage. */
@@ -69,7 +70,7 @@ static const char* auth_pass;
 static sblist* auth_ips;
 static pthread_rwlock_t auth_ips_lock = PTHREAD_RWLOCK_INITIALIZER;
 static const struct server* server;
-static union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
+static sblist* bind_addrs;
 static const char* bind_addr_str;
 
 enum socksstate {
@@ -139,7 +140,7 @@ char *trim_whitespace(char *str) {
 int read_config(const char *filename, const char* listenip, unsigned* port) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
-        perror("Could not open configuration file");
+        perror("Configuration file not found");
         return -1;
     }
 
@@ -182,7 +183,7 @@ static struct addrinfo* addr_choose(struct addrinfo* list, union sockaddr_union*
 	return list;
 }
 
-static int connect_socks_target(unsigned char *buf, size_t n, struct client *client) {
+static int connect_socks_target(unsigned char *buf, size_t n, struct client *client, union sockaddr_union *bind_addr) {
 	if(n < 5) return -EC_GENERAL_FAILURE;
 	if(buf[0] != 5) return -EC_GENERAL_FAILURE;
 	if(buf[1] != 1) return -EC_COMMAND_NOT_SUPPORTED; /* we support only CONNECT method */
@@ -243,8 +244,8 @@ static int connect_socks_target(unsigned char *buf, size_t n, struct client *cli
 			return -EC_GENERAL_FAILURE;
 		}
 	}
-	if(SOCKADDR_UNION_AF(&bind_addr) == raddr->ai_family &&
-	   bindtoip(fd, &bind_addr) == -1)
+	if(SOCKADDR_UNION_AF(bind_addr) == raddr->ai_family &&
+	   bindtoip(fd, bind_addr) == -1)
 		goto eval_errno;
 	if(connect(fd, raddr->ai_addr, raddr->ai_addrlen) == -1)
 		goto eval_errno;
@@ -408,7 +409,13 @@ static int handshake(struct thread *t) {
 				}
 				break;
 			case SS_3_AUTHED:
-				ret = connect_socks_target(buf, n, &t->client);
+				if (sblist_getsize(bind_addrs) == 0) {
+					union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
+					ret = connect_socks_target(buf, n, &t->client, &bind_addr);
+				} else {
+					int index = rand() % sblist_getsize(bind_addrs);
+					ret = connect_socks_target(buf, n, &t->client, sblist_get(bind_addrs, index));
+				}
 				if(ret < 0) {
 					send_error(t->client.fd, ret*-1);
 					return -1;
@@ -475,11 +482,14 @@ static void zero_arg(char *s) {
 }
 
 int main(int argc, char** argv) {
+	srand(time(0));
 	int bindaddr_resolved = 0;
 	int ch;
 	const char *listenip2 = "0.0.0.0";
 	char *p, *q;
 	unsigned port2 = 1080;
+
+    bind_addrs = sblist_new(sizeof(union sockaddr_union), 8);
 	read_config("sample.conf", listenip2, &port2);
 	printf("Listen ip is %s", listenip2);
 	printf("port is %d", port2);
@@ -512,7 +522,18 @@ int main(int argc, char** argv) {
 				quiet = 1;
 				break;
 			case 'b':
-				resolve_sa(optarg, 0, &bind_addr);
+				p = optarg;
+				while(1) {
+					union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
+					if((q = strchr(p, ','))) *q = 0;
+					if(resolve_sa(optarg, 0, &bind_addr)) {
+						dprintf(2, "error: failed to resolve %s\n", p);
+						return 1;
+					}
+					sblist_add(bind_addrs, &bind_addr);
+					if(q) *(q++) = ',', p = q;
+					else break;
+				}
 				bindaddr_resolved = 1;
 				break;
 			case 'u':
@@ -536,9 +557,9 @@ int main(int argc, char** argv) {
 				return usage();
 		}
 	}
-	if(!bindaddr_resolved && strcmp(bind_addr_str, "default") != 0) {
-		resolve_sa(bind_addr_str, 0, &bind_addr);
-	}
+	// if(!bindaddr_resolved && strcmp(bind_addr_str, "default") != 0) {
+	// 	resolve_sa(bind_addr_str, 0, &bind_addr);
+	// }
 	if((auth_user && !auth_pass) || (!auth_user && auth_pass)) {
 		dprintf(2, "error: user and pass must be used together\n");
 		return 1;
