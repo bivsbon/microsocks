@@ -409,11 +409,13 @@ static int handshake(struct thread *t) {
 				}
 				break;
 			case SS_3_AUTHED:
+				dolog("Size of bind_addrs is: %d\n", sblist_getsize(bind_addrs));
 				if (sblist_getsize(bind_addrs) == 0) {
 					union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
 					ret = connect_socks_target(buf, n, &t->client, &bind_addr);
 				} else {
 					int index = rand() % sblist_getsize(bind_addrs);
+					dolog("Get at index: %d\n", index);
 					ret = connect_socks_target(buf, n, &t->client, sblist_get(bind_addrs, index));
 				}
 				if(ret < 0) {
@@ -491,12 +493,8 @@ int main(int argc, char** argv) {
 
     bind_addrs = sblist_new(sizeof(union sockaddr_union), 8);
 	read_config("sample.conf", listenip2, &port2);
-	printf("Listen ip is %s", listenip2);
-	printf("port is %d", port2);
 	const char *listenip = "0.0.0.0";
 	unsigned port = 1080;
-	// printf("User is %s", auth_user);
-	// printf("Password is %s", auth_pass);
 
 	while((ch = getopt(argc, argv, ":1qb:i:p:u:P:w:")) != -1) {
 		switch(ch) {
@@ -526,7 +524,7 @@ int main(int argc, char** argv) {
 				while(1) {
 					union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
 					if((q = strchr(p, ','))) *q = 0;
-					if(resolve_sa(optarg, 0, &bind_addr)) {
+					if(resolve_sa(p, 0, &bind_addr)) {
 						dprintf(2, "error: failed to resolve %s\n", p);
 						return 1;
 					}
