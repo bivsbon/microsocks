@@ -409,15 +409,17 @@ static int handshake(struct thread *t) {
 				}
 				break;
 			case SS_3_AUTHED:
-				dolog("Size of bind_addrs is: %d\n", sblist_getsize(bind_addrs));
-				if (sblist_getsize(bind_addrs) == 0) {
-					union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
-					ret = connect_socks_target(buf, n, &t->client, &bind_addr);
-				} else {
-					int index = rand() % sblist_getsize(bind_addrs);
-					dolog("Get at index: %d\n", index);
-					ret = connect_socks_target(buf, n, &t->client, sblist_get(bind_addrs, index));
-				}
+				union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
+				ret = connect_socks_target(buf, n, &t->client, &bind_addr);
+				// dolog("Size of bind_addrs is: %d\n", sblist_getsize(bind_addrs));
+				// if (sblist_getsize(bind_addrs) == 0) {
+				// 	union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
+				// 	ret = connect_socks_target(buf, n, &t->client, &bind_addr);
+				// } else {
+				// 	int index = rand() % sblist_getsize(bind_addrs);
+				// 	dolog("Get at index: %d\n", index);
+				// 	ret = connect_socks_target(buf, n, &t->client, sblist_get(bind_addrs, index));
+				// }
 				if(ret < 0) {
 					send_error(t->client.fd, ret*-1);
 					return -1;
@@ -430,6 +432,7 @@ static int handshake(struct thread *t) {
 }
 
 static void* clientthread(void *data) {
+	dolog("In client thread");
 	struct thread *t = data;
 	int remotefd = handshake(t);
 	if(remotefd != -1) {
@@ -515,6 +518,7 @@ int main(int argc, char** argv) {
 					if(q) *(q++) = ',', p = q;
 					else break;
 				}
+				dolog("Size of bind_addrs is: %ld\n", sblist_getsize(bind_addrs));
 				break;
 			case 'q':
 				quiet = 1;
