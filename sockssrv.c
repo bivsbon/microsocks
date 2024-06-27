@@ -493,7 +493,6 @@ int main(int argc, char** argv) {
 
     bind_addrs = sblist_new(sizeof(union sockaddr_union), 8);
 	read_config("sample.conf", listenip, &port);
-	unsigned port = 1080;
 
 	while((ch = getopt(argc, argv, ":1qb:i:p:u:P:w:")) != -1) {
 		switch(ch) {
