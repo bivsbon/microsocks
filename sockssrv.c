@@ -411,17 +411,13 @@ static int handshake(struct thread *t) {
 				}
 				break;
 			case SS_3_AUTHED:
-				dolog("Size of bind_addrs is: %d\n", sblist_getsize(bind_addrs));
 				if (sblist_getsize(bind_addrs) == 0) {
 					union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
 					ret = connect_socks_target(buf, n, &t->client, &bind_addr);
 				} else {
 					int index = rand() % sblist_getsize(bind_addrs);
-					dolog("Get at index: %d\n", index);
 					ret = connect_socks_target(buf, n, &t->client, sblist_get(bind_addrs, index));
 				}
-				// union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
-				// ret = connect_socks_target(buf, n, &t->client, &bind_addr);
 				if(ret < 0) {
 					send_error(t->client.fd, ret*-1);
 					return -1;
@@ -434,7 +430,6 @@ static int handshake(struct thread *t) {
 }
 
 static void* clientthread(void *data) {
-	dolog("In client thread");
 	struct thread *t = data;
 	int remotefd = handshake(t);
 	if(remotefd != -1) {
@@ -513,14 +508,13 @@ int main(int argc, char** argv) {
 					union sockaddr_union ca;
 					if((q = strchr(p, ','))) *q = 0;
 					if(resolve_sa(p, 0, &ca)) {
-						dprintf(2, "error: failed to resolve %s\n", p);
+						dprintf(2, "error: failed to resolve %s in whitelist\n", p);
 						return 1;
 					}
 					add_auth_ip(&ca);
 					if(q) *(q++) = ',', p = q;
 					else break;
 				}
-				dolog("Size of bind_addrs is: %ld\n", sblist_getsize(bind_addrs));
 				break;
 			case 'q':
 				quiet = 1;
@@ -531,7 +525,7 @@ int main(int argc, char** argv) {
 					union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
 					if((q = strchr(p, ','))) *q = 0;
 					if(resolve_sa(p, 0, &bind_addr)) {
-						dprintf(2, "error: failed to resolve %s\n", p);
+						dprintf(2, "error: failed to resolve %s in bind addresses\n", p);
 						return 1;
 					}
 					sblist_add(bind_addrs, &bind_addr);
@@ -561,9 +555,20 @@ int main(int argc, char** argv) {
 				return usage();
 		}
 	}
-	// if(!bindaddr_resolved && strcmp(bind_addr_str, "default") != 0) {
-	// 	resolve_sa(bind_addr_str, 0, &bind_addr);
-	// }
+	if(!bindaddr_resolved) {
+		p = bind_addr_str;
+		while(1) {
+			union sockaddr_union bind_addr = {.v4.sin_family = AF_UNSPEC};
+			if((q = strchr(p, ','))) *q = 0;
+			if(resolve_sa(p, 0, &bind_addr)) {
+				dprintf(2, "error: failed to resolve %s in bind addresses\n", p);
+				return 1;
+			}
+			sblist_add(bind_addrs, &bind_addr);
+			if(q) *(q++) = ',', p = q;
+			else break;
+		}
+	}
 	if((auth_user && !auth_pass) || (!auth_user && auth_pass)) {
 		dprintf(2, "error: user and pass must be used together\n");
 		return 1;
