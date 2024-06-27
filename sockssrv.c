@@ -487,13 +487,12 @@ int main(int argc, char** argv) {
 	srand(time(0));
 	int bindaddr_resolved = 0;
 	int ch;
-	const char *listenip2 = "0.0.0.0";
+	const char *listenip = "0.0.0.0";
+	unsigned port = 1080;
 	char *p, *q;
-	unsigned port2 = 1080;
 
     bind_addrs = sblist_new(sizeof(union sockaddr_union), 8);
-	read_config("sample.conf", listenip2, &port2);
-	const char *listenip = "0.0.0.0";
+	read_config("sample.conf", listenip, &port);
 	unsigned port = 1080;
 
 	while((ch = getopt(argc, argv, ":1qb:i:p:u:P:w:")) != -1) {
